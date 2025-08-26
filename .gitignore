@@ -1,1 +1,3 @@
 venv/*
+all_invoices.pdf
+generated_invoices*
