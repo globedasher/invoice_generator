@@ -330,9 +330,16 @@ def convert_to_pdf(xlsx_path: str, pdf_path: str) -> None:
 def convert_with_libreoffice(xlsx_path: str, pdf_path: str) -> None:
     """Convert Excel file to PDF using LibreOffice."""
     tmp = tempfile.mkdtemp()
+    
+    # Determine LibreOffice executable path based on platform
+    if platform.system() == "Windows":
+        soffice_cmd = r"C:\Program Files\LibreOffice\program\soffice.exe"
+    else:
+        soffice_cmd = "soffice"
+    
     try:
         subprocess.run(
-            ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tmp, xlsx_path],
+            [soffice_cmd, "--headless", "--convert-to", "pdf", "--outdir", tmp, xlsx_path],
             check=True
         )
         generated_pdf = os.path.join(tmp, os.path.basename(xlsx_path).replace(".xlsx", ".pdf"))
