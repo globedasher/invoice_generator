@@ -18,7 +18,13 @@ public:
     bool generatePDF(const QList<Order>& orders, const QString& outputPath);
     
 private:
-    void drawInvoice(QPainter& painter, const Order& order, const QRect& pageRect);
+    void drawInvoice(QPainter& painter, const Order& order, const QRect& pageRect, QPrinter& printer);
+    bool needsMultiplePages(const Order& order, const QRect& pageRect) const;
+    void drawSinglePageInvoice(QPainter& painter, const Order& order, const QRect& pageRect);
+    void drawMultiPageInvoice(QPainter& painter, const Order& order, const QRect& pageRect, QPrinter& printer);
+    void drawLogo(QPainter& painter, const QRect& pageRect);
+    void drawContinuationHeader(QPainter& painter, const Order& order, const QRect& pageRect);
+    int drawLineItemsSubset(QPainter& painter, const Order& order, const QRect& pageRect, int startIndex, int count, int startY);
     void drawHeader(QPainter& painter, const Order& order, const QRect& pageRect);
     void drawBillingInfo(QPainter& painter, const Order& order, const QRect& pageRect);
     int drawLineItems(QPainter& painter, const Order& order, const QRect& pageRect);  // Returns currentY after last item

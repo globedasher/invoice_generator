@@ -18,6 +18,9 @@ void PDFGenerator::setTemplate(const InvoiceTemplate& templateData) {
     m_template = templateData;
     if (!m_template.logoPath.isEmpty()) {
         m_logo = QPixmap(m_template.logoPath);
+        qDebug() << "PDFGenerator: Loaded logo from" << m_template.logoPath << "- size:" << m_logo.size() << "null:" << m_logo.isNull();
+    } else {
+        qDebug() << "PDFGenerator: No logo path provided";
     }
 }
 
@@ -42,36 +45,133 @@ bool PDFGenerator::generatePDF(const QList<Order>& orders, const QString& output
     QRect pageRect = painter.viewport();
     qDebug() << "Page rect:" << pageRect << "DPI:" << printer.resolution();
     
-    for (int i = 0; i < orders.size(); i++) {
-        if (i > 0) {
+    bool firstOrder = true;
+    for (const auto& order : orders) {
+        if (!firstOrder) {
             printer.newPage();
         }
-        drawInvoice(painter, orders[i], pageRect);
+        firstOrder = false;
+        
+        // Draw invoice with potential multi-page handling
+        drawInvoice(painter, order, pageRect, printer);
     }
     
     return true;
 }
 
-void PDFGenerator::drawInvoice(QPainter& painter, const Order& order, const QRect& pageRect) {
+void PDFGenerator::drawInvoice(QPainter& painter, const Order& order, const QRect& pageRect, QPrinter& printer) {
+    // Check if this order needs multiple pages
+    if (needsMultiplePages(order, pageRect)) {
+        drawMultiPageInvoice(painter, order, pageRect, printer);
+    } else {
+        drawSinglePageInvoice(painter, order, pageRect);
+    }
+}
+
+bool PDFGenerator::needsMultiplePages(const Order& order, const QRect& pageRect) const {
+    int pageHeight = pageRect.height();
+    double scaleY = pageHeight / 776.0;
+    
+    // Estimate space needed
+    int headerSpace = 250 * scaleY;  // Header + billing info
+    int footerSpace = 150 * scaleY;  // Totals + footer
+    int availableForItems = pageHeight - headerSpace - footerSpace - 50 * scaleY; // Safety margin
+    
+    // Estimate line item space (normal sizing for readability)
+    int itemHeight = 22 * scaleY;  // Normal row height for multi-page
+    int estimatedItemsHeight = order.lineItems.size() * itemHeight;
+    
+    return estimatedItemsHeight > availableForItems;
+}
+
+void PDFGenerator::drawMultiPageInvoice(QPainter& painter, const Order& order, const QRect& pageRect, QPrinter& printer) {
+    int pageWidth = pageRect.width();
+    int pageHeight = pageRect.height();
+    double scaleY = pageHeight / 776.0;
+    
+    // Page 1: Logo, header, billing, and as many line items as fit
+    drawLogo(painter, pageRect);
+    drawHeader(painter, order, pageRect);
+    drawBillingInfo(painter, order, pageRect);
+    
+    // Calculate available space for line items on first page  
+    int headerEndY = 200 * scaleY;  // End of header/billing section (reduced from 280)
+    int reservedSpace = 120 * scaleY; // Reserve space for totals/footer on last page
+    int itemHeight = 22 * scaleY; // Normal height for readability
+    
+    int availableHeight = pageHeight - headerEndY - 30 * scaleY; // Reduced safety margin
+    int itemsFirstPage = availableHeight / itemHeight;
+    
+    // Draw line items for first page
+    int itemsDrawn = 0;
+    int endY = drawLineItemsSubset(painter, order, pageRect, 0, itemsFirstPage, headerEndY);
+    itemsDrawn += itemsFirstPage;
+    
+    // Continue with additional pages if needed
+    while (itemsDrawn < order.lineItems.size()) {
+        printer.newPage();
+        
+        // Draw logo and table headers on continuation page
+        drawLogo(painter, pageRect);
+        drawContinuationHeader(painter, order, pageRect);
+        
+        int continuationHeaderEnd = 80 * scaleY;  // Reduced from 120 to remove excessive spacing
+        int availableOnContinuation = pageHeight - continuationHeaderEnd - 30 * scaleY;
+        int itemsThisPage = qMin(availableOnContinuation / itemHeight, 
+                                order.lineItems.size() - itemsDrawn);
+        
+        // Check if this is the last page - reserve space for totals/footer
+        bool isLastPage = (itemsDrawn + itemsThisPage >= order.lineItems.size());
+        if (isLastPage) {
+            availableOnContinuation -= reservedSpace;
+            itemsThisPage = qMin(availableOnContinuation / itemHeight, 
+                                order.lineItems.size() - itemsDrawn);
+        }
+        
+        endY = drawLineItemsSubset(painter, order, pageRect, itemsDrawn, itemsThisPage, continuationHeaderEnd);
+        itemsDrawn += itemsThisPage;
+        
+        // If this is the last page, draw totals and footer
+        if (itemsDrawn >= order.lineItems.size()) {
+            int totalsStartY = endY + 20 * scaleY;
+            int totalsEndY = drawTotals(painter, order, pageRect, totalsStartY);
+            drawFooter(painter, order, pageRect, totalsEndY + 10 * scaleY);
+        }
+    }
+}
+
+void PDFGenerator::drawSinglePageInvoice(QPainter& painter, const Order& order, const QRect& pageRect) {
     int pageWidth = pageRect.width();
     int pageHeight = pageRect.height();
     
     // Calculate positions as percentages of page size
     int margin = pageWidth * 0.05; // 5% margin
     
-    // Draw logo at template position (square, maintaining aspect ratio)
+    // Draw logo at template position, maintaining proper aspect ratio
     if (!m_logo.isNull()) {
         // Use template positions scaled to PDF page size
         double scaleX = pageWidth / 700.0;  
         double scaleY = pageHeight / 776.0; 
         
-        QRect logoRect(m_template.logoPosition.x() * scaleX, 
-                      m_template.logoPosition.y() * scaleY,
-                      m_template.logoPosition.width() * scaleX,
-                      m_template.logoPosition.height() * scaleY);
+        QRect templateRect(m_template.logoPosition.x() * scaleX, 
+                          m_template.logoPosition.y() * scaleY,
+                          m_template.logoPosition.width() * scaleX,
+                          m_template.logoPosition.height() * scaleY);
         
-        // Draw logo maintaining aspect ratio and preventing shrinking
-        painter.drawPixmap(logoRect, m_logo, m_logo.rect());
+        // Calculate scaled size that maintains aspect ratio and fits within template rect
+        QSize logoSize = m_logo.size();
+        QSize targetSize = templateRect.size();
+        
+        // Scale to fit within the target rectangle while maintaining aspect ratio
+        QSize scaledSize = logoSize.scaled(targetSize, Qt::KeepAspectRatio);
+        
+        // Center the logo within the template rectangle
+        QRect logoRect;
+        logoRect.setSize(scaledSize);
+        logoRect.moveCenter(templateRect.center());
+        
+        // Draw logo with proper aspect ratio
+        painter.drawPixmap(logoRect, m_logo);
     }
     
     drawHeader(painter, order, pageRect);
@@ -90,6 +190,32 @@ void PDFGenerator::drawInvoice(QPainter& painter, const Order& order, const QRec
     int footerStartY = qMin(totalsEndY + 10, maxContentY - 40);  // Reduced gap if needed, ensure footer fits
     drawFooter(painter, order, pageRect, footerStartY);
 }
+
+void PDFGenerator::drawLogo(QPainter& painter, const QRect& pageRect) {
+    int pageWidth = pageRect.width();
+    int pageHeight = pageRect.height();
+    
+    if (!m_logo.isNull()) {
+        double scaleX = pageWidth / 700.0;  
+        double scaleY = pageHeight / 776.0; 
+        
+        QRect templateRect(m_template.logoPosition.x() * scaleX, 
+                          m_template.logoPosition.y() * scaleY,
+                          m_template.logoPosition.width() * scaleX,
+                          m_template.logoPosition.height() * scaleY);
+        
+        QSize logoSize = m_logo.size();
+        QSize targetSize = templateRect.size();
+        QSize scaledSize = logoSize.scaled(targetSize, Qt::KeepAspectRatio);
+        
+        QRect logoRect;
+        logoRect.setSize(scaledSize);
+        logoRect.moveCenter(templateRect.center());
+        
+        painter.drawPixmap(logoRect, m_logo);
+    }
+}
+
 
 void PDFGenerator::drawHeader(QPainter& painter, const Order& order, const QRect& pageRect) {
     int pageWidth = pageRect.width();
@@ -273,43 +399,145 @@ int PDFGenerator::drawTotals(QPainter& painter, const Order& order, const QRect&
     int pageWidth = pageRect.width();
     int pageHeight = pageRect.height();
     
-    // Position totals dynamically after line items
-    int totalsX = pageWidth * 0.65;
-    int totalsWidth = pageWidth * 0.3;
-    int totalsStartY = startY;  // Start at provided Y position
+    // Use template positions scaled to PDF page size (align with line totals column)
+    double scaleX = pageWidth / 700.0;
+    double scaleY = pageHeight / 776.0;
+    
+    // Get table start position to match template editor
+    int tableStartX = m_template.tableStartPos.x() * scaleX;
+    int totalsLabelX = tableStartX + 400 * scaleX; // Keep labels in original position
+    int totalsValueX = tableStartX + 550 * scaleX; // Align values with "Line Total" column
+    int totalsStartY = startY;
     int lineHeight = pageHeight * 0.025;
     
     painter.setFont(m_bodyFont);
     
     // Subtotal
-    QRect subtotalLabelRect(totalsX, totalsStartY, totalsWidth * 0.6, lineHeight);
-    QRect subtotalValueRect(totalsX + totalsWidth * 0.6, totalsStartY, totalsWidth * 0.4, lineHeight);
-    painter.drawText(subtotalLabelRect, Qt::AlignLeft, "Subtotal:");
-    painter.drawText(subtotalValueRect, Qt::AlignRight, QString("$%1").arg(order.subtotal, 0, 'f', 2));
+    QRect subtotalLabelRect(totalsLabelX, totalsStartY, 130 * scaleX, lineHeight);
+    QRect subtotalValueRect(totalsValueX, totalsStartY, 80 * scaleX, lineHeight);
+    painter.drawText(subtotalLabelRect, Qt::AlignRight, "Subtotal:");
+    painter.drawText(subtotalValueRect, Qt::AlignCenter, QString("$%1").arg(order.subtotal, 0, 'f', 2));
     
     // Tax
     int taxY = totalsStartY + lineHeight + 5;
-    QRect taxLabelRect(totalsX, taxY, totalsWidth * 0.6, lineHeight);
-    QRect taxValueRect(totalsX + totalsWidth * 0.6, taxY, totalsWidth * 0.4, lineHeight);
-    painter.drawText(taxLabelRect, Qt::AlignLeft, "Tax:");
-    painter.drawText(taxValueRect, Qt::AlignRight, QString("$%1").arg(order.taxes, 0, 'f', 2));
+    QRect taxLabelRect(totalsLabelX, taxY, 130 * scaleX, lineHeight);
+    QRect taxValueRect(totalsValueX, taxY, 80 * scaleX, lineHeight);
+    painter.drawText(taxLabelRect, Qt::AlignRight, "Tax:");
+    painter.drawText(taxValueRect, Qt::AlignCenter, QString("$%1").arg(order.taxes, 0, 'f', 2));
     
     // Total (with heavier font and line above)
     int totalY = taxY + lineHeight + 10;
     
     // Draw line above total
     painter.setPen(QPen(Qt::black, 2));
-    painter.drawLine(totalsX, totalY - 5, totalsX + totalsWidth, totalY - 5);
+    painter.drawLine(totalsLabelX, totalY - 5, totalsValueX + 80 * scaleX, totalY - 5);
     painter.setPen(QPen(Qt::black, 1));
     
     painter.setFont(m_headerFont);
-    QRect totalLabelRect(totalsX, totalY, totalsWidth * 0.6, lineHeight);
-    QRect totalValueRect(totalsX + totalsWidth * 0.6, totalY, totalsWidth * 0.4, lineHeight);
-    painter.drawText(totalLabelRect, Qt::AlignLeft, "Total:");
-    painter.drawText(totalValueRect, Qt::AlignRight, QString("$%1").arg(order.total, 0, 'f', 2));
+    QRect totalLabelRect(totalsLabelX, totalY, 130 * scaleX, lineHeight);
+    QRect totalValueRect(totalsValueX, totalY, 80 * scaleX, lineHeight);
+    painter.drawText(totalLabelRect, Qt::AlignRight, "Total:");
+    painter.drawText(totalValueRect, Qt::AlignCenter, QString("$%1").arg(order.total, 0, 'f', 2));
     
     // Return Y position after totals
     return totalY + lineHeight;
+}
+
+void PDFGenerator::drawContinuationHeader(QPainter& painter, const Order& order, const QRect& pageRect) {
+    int pageWidth = pageRect.width();
+    int pageHeight = pageRect.height();
+    
+    double scaleX = pageWidth / 700.0;
+    double scaleY = pageHeight / 776.0;
+    
+    painter.setFont(m_headerFont);
+    
+    // Draw "Order <number> (continued)" at top of continuation page
+    QPoint orderPos(m_template.orderNumberPos.x() * scaleX, 30 * scaleY);
+    QString orderText = QString("Order %1 (continued)").arg(order.orderId);
+    painter.drawText(orderPos, orderText);
+    
+    // Draw table headers
+    int tableStartY = 40 * scaleY;  // Reduced from 60 to minimize spacing
+    int tableX = m_template.tableStartPos.x() * scaleX;
+    int qtyX = tableX + 15 * scaleX;
+    int descX = tableX + 60 * scaleX;
+    int priceX = tableX + 450 * scaleX;
+    int totalX = tableX + 550 * scaleX;
+    
+    painter.drawText(QPoint(qtyX, tableStartY), "Qty");
+    painter.drawText(QPoint(descX, tableStartY), "Description");
+    painter.drawText(QPoint(priceX, tableStartY), "Unit Price");
+    painter.drawText(QPoint(totalX, tableStartY), "Line Total");
+    
+    // Draw line under headers
+    int headerLineY = tableStartY + 15 * scaleY;
+    painter.setPen(QPen(Qt::black, 2));
+    painter.drawLine(tableX, headerLineY, tableX + 630 * scaleX, headerLineY);
+    painter.setPen(QPen(Qt::black, 1));
+}
+
+int PDFGenerator::drawLineItemsSubset(QPainter& painter, const Order& order, const QRect& pageRect, int startIndex, int count, int startY) {
+    int pageWidth = pageRect.width();
+    int pageHeight = pageRect.height();
+    
+    double scaleX = pageWidth / 700.0;
+    double scaleY = pageHeight / 776.0;
+    
+    // Define column positions matching main drawLineItems
+    int tableX = m_template.tableStartPos.x() * scaleX;
+    int qtyX = tableX + 15 * scaleX;
+    int descX = tableX + 60 * scaleX;
+    int priceX = tableX + 450 * scaleX;
+    int totalX = tableX + 550 * scaleX;
+    
+    painter.setFont(m_bodyFont);
+    
+    int currentY = startY + 10 * scaleY;  // Start below header line
+    int itemHeight = 22 * scaleY;  // Normal height for multi-page readability
+    
+    // Draw the specified range of line items
+    int endIndex = qMin(startIndex + count, order.lineItems.size());
+    for (int i = startIndex; i < endIndex; i++) {
+        const auto& item = order.lineItems[i];
+        
+        // Calculate actual height needed for description
+        QRect descBounds(descX, 0, 380 * scaleX, 1000);
+        QRect actualDescRect = painter.boundingRect(descBounds, Qt::AlignLeft | Qt::TextWordWrap, item.description);
+        int calculatedHeight = actualDescRect.height() + 4 * scaleY;
+        int actualRowHeight = qMax(itemHeight, calculatedHeight);
+        
+        // Check for highlighting
+        QColor bgColor;
+        for (const auto& rule : m_highlightRules) {
+            if (item.description.contains(rule.textMatch, Qt::CaseInsensitive)) {
+                bgColor = rule.color;
+                break;
+            }
+        }
+        
+        int rowTopY = currentY - 5 * scaleY;
+        int verticalCenter = currentY + actualRowHeight / 2 - 5 * scaleY;
+        
+        // Draw highlight background if needed
+        if (bgColor.isValid()) {
+            QRect highlightRect(tableX - 3 * scaleX, rowTopY, 630 * scaleX, actualRowHeight);
+            painter.fillRect(highlightRect, bgColor);
+        }
+        
+        // Draw line item data
+        painter.drawText(QPoint(qtyX, verticalCenter), QString::number(item.quantity));
+        painter.drawText(QPoint(priceX, verticalCenter), QString("$%1").arg(item.unitPrice, 0, 'f', 2));
+        painter.drawText(QPoint(totalX, verticalCenter), QString("$%1").arg(item.lineTotal(), 0, 'f', 2));
+        
+        // Description with word wrap
+        QRect descRect(descX, rowTopY, 380 * scaleX, actualRowHeight);
+        painter.drawText(descRect, Qt::AlignLeft | Qt::TextWordWrap | Qt::AlignTop, item.description);
+        
+        currentY += actualRowHeight + 4 * scaleY;  // Normal spacing for multi-page
+    }
+    
+    return currentY;
 }
 
 void PDFGenerator::drawFooter(QPainter& painter, const Order& order, const QRect& pageRect, int startY) {
@@ -318,30 +546,32 @@ void PDFGenerator::drawFooter(QPainter& painter, const Order& order, const QRect
     int pageWidth = pageRect.width();
     int pageHeight = pageRect.height();
     
-    // Use dynamic positioning instead of template positions
+    // Use dynamic positioning, positioned to the left of totals
     double scaleX = pageWidth / 700.0;
     double scaleY = pageHeight / 776.0;
     
     painter.setFont(m_bodyFont);
     
-    // Position footer dynamically after totals
-    int thankYouY = startY;
-    int policyY = startY + 30 * scaleY;
+    // Position footer in left column (same as billing info alignment)
+    int footerX = 50 * scaleX; // Left side, same as billing info
+    int footerWidth = 380 * scaleX; // Width up to totals area
     
-    // Ensure footer stays within page bounds (leave 30px margin from bottom)
-    int maxFooterY = pageHeight - 90 * scaleY;  // 90px from bottom for both texts
-    if (thankYouY > maxFooterY - 40 * scaleY) {
-        thankYouY = maxFooterY - 40 * scaleY;
-        policyY = thankYouY + 30 * scaleY;
+    int footerStartY = startY - 60 * scaleY; // Start at same level as totals
+    int thankYouY = footerStartY;
+    int policyY = footerStartY + 50 * scaleY;
+    
+    // Ensure footer stays within page bounds
+    int maxFooterY = pageHeight - 90 * scaleY;
+    if (thankYouY > maxFooterY - 80 * scaleY) {
+        thankYouY = maxFooterY - 80 * scaleY;
+        policyY = thankYouY + 50 * scaleY;
     }
     
-    // Thank you message with bounds checking
-    QPoint thankYouPos(m_template.thankYouPos.x() * scaleX, thankYouY);
-    QRect thankYouRect(thankYouPos.x(), thankYouPos.y(), 300 * scaleX, 40 * scaleY);
+    // Thank you message (left column)
+    QRect thankYouRect(footerX, thankYouY, footerWidth, 40 * scaleY);
     painter.drawText(thankYouRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.thankYouText);
     
-    // Policy text with bounds checking
-    QPoint policyPos(m_template.policyPos.x() * scaleX, policyY);
-    QRect policyRect(policyPos.x(), policyPos.y(), 500 * scaleX, 50 * scaleY);  // Reduced height
+    // Policy text (left column)
+    QRect policyRect(footerX, policyY, footerWidth, 80 * scaleY);
     painter.drawText(policyRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.policyText);
 }

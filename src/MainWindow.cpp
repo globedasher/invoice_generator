@@ -171,7 +171,7 @@ void MainWindow::setupTemplateTab() {
     connect(m_templateEditor, &TemplateEditor::templateChanged, [this]() {
         m_template = m_templateEditor->getTemplate();
         m_pdfGenerator->setTemplate(m_template);
-        qDebug() << "Template updated - new logo position:" << m_template.logoPosition;
+        qDebug() << "Template updated - logo position:" << m_template.logoPosition << "logo path:" << m_template.logoPath;
     });
     
     layout->addWidget(m_templateEditor);

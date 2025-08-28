@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QDebug>
 #include <QApplication>
+#include <QFile>
 
 // TemplatePreview implementation
 TemplatePreview::TemplatePreview(QWidget* parent)
@@ -19,6 +20,15 @@ TemplatePreview::TemplatePreview(QWidget* parent)
     // Based on Python code: B2=order#, G5=date, B3-B5=billing, B8+=line items, H37-39=totals
     
     m_template.logoPosition = QRect(590, 20, 100, 100);  // Far right for 700px width
+    
+    // Auto-load logo.png if it exists
+    if (QFile::exists("logo.png")) {
+        m_template.logoPath = "logo.png";
+        m_logo = QPixmap("logo.png");
+        qDebug() << "TemplatePreview: Auto-loaded logo.png, size:" << m_logo.size();
+    } else {
+        qDebug() << "TemplatePreview: logo.png not found for auto-load";
+    }
     
     // Header positions - align order and billing on left side
     m_template.orderNumberPos = QPoint(50, 30);    // Move order to left side
@@ -197,57 +207,62 @@ void TemplatePreview::drawTemplate(QPainter& painter) {
         }
     }
     
-    // Draw totals and footer dynamically positioned after line items (matching PDF generator behavior)
+    // Draw totals and footer dynamically positioned after line items
     painter.setFont(bodyFont);
     
     double subtotal = m_previewOrder.subtotal > 0 ? m_previewOrder.subtotal : 73.00;
     double tax = m_previewOrder.taxes > 0 ? m_previewOrder.taxes : 4.82;
     double total = m_previewOrder.total > 0 ? m_previewOrder.total : 77.82;
     
-    // Position totals dynamically after line items (add some spacing)
+    // Position totals dynamically after line items
     int totalsStartY = tableY + 20; // 20px spacing after line items
-    int totalsX = 450; // Right-aligned position (matching template column layout)
+    int totalsLabelX = tableX + 400; // Keep labels in original position 
+    int totalsValueX = tableX + 550; // Align values with "Line Total" column
     int lineSpacing = 20;
     
+    // Footer positioned to the left of totals
+    int footerX = 50; // Left side, same as billing info
+    int footerWidth = 380; // Width up to totals area
+    
+    // Draw footer first (so it appears behind totals if they overlap)
+    painter.setFont(bodyFont);
+    int footerStartY = totalsStartY;
+    
+    // Thank you message (editable) - positioned left of totals
+    QRect thankYouRect(footerX, footerStartY, footerWidth, 40);
+    painter.drawText(thankYouRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.thankYouText);
+    
+    // Policy text (editable) - positioned left of totals
+    QRect policyRect(footerX, footerStartY + 50, footerWidth, 80);
+    painter.drawText(policyRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.policyText);
+    
+    // Draw totals aligned with line totals column
     // Subtotal
-    QRect subtotalLabelRect(totalsX - 80, totalsStartY, 70, 20);
-    QRect subtotalValueRect(totalsX, totalsStartY, 80, 20);
-    painter.drawText(subtotalLabelRect, Qt::AlignLeft, "Subtotal:");
-    painter.drawText(subtotalValueRect, Qt::AlignRight, QString("$%1").arg(subtotal, 0, 'f', 2));
+    QRect subtotalLabelRect(totalsLabelX, totalsStartY, 130, 20);
+    QRect subtotalValueRect(totalsValueX, totalsStartY, 80, 20);
+    painter.drawText(subtotalLabelRect, Qt::AlignRight, "Subtotal:");
+    painter.drawText(subtotalValueRect, Qt::AlignCenter, QString("$%1").arg(subtotal, 0, 'f', 2));
     
     // Tax
     int taxY = totalsStartY + lineSpacing;
-    QRect taxLabelRect(totalsX - 80, taxY, 70, 20);
-    QRect taxValueRect(totalsX, taxY, 80, 20);
-    painter.drawText(taxLabelRect, Qt::AlignLeft, "Tax:");
-    painter.drawText(taxValueRect, Qt::AlignRight, QString("$%1").arg(tax, 0, 'f', 2));
+    QRect taxLabelRect(totalsLabelX, taxY, 130, 20);
+    QRect taxValueRect(totalsValueX, taxY, 80, 20);
+    painter.drawText(taxLabelRect, Qt::AlignRight, "Tax:");
+    painter.drawText(taxValueRect, Qt::AlignCenter, QString("$%1").arg(tax, 0, 'f', 2));
     
     // Total (with bold font and line above)
     int totalY = taxY + lineSpacing + 5;
     
     // Draw line above total
     painter.setPen(QPen(borderColor, 2));
-    painter.drawLine(totalsX - 80, totalY - 3, totalsX + 80, totalY - 3);
+    painter.drawLine(totalsLabelX, totalY - 3, totalsValueX + 80, totalY - 3);
     painter.setPen(textColor);
     
     painter.setFont(QFont("Arial", 10, QFont::Bold));
-    QRect totalLabelRect(totalsX - 80, totalY, 70, 20);
-    QRect totalValueRect(totalsX, totalY, 80, 20);
-    painter.drawText(totalLabelRect, Qt::AlignLeft, "Total:");
-    painter.drawText(totalValueRect, Qt::AlignRight, QString("$%1").arg(total, 0, 'f', 2));
-    
-    // Draw footer text dynamically positioned after totals (matching PDF generator behavior)
-    painter.setFont(bodyFont);
-    
-    int footerStartY = totalY + 40; // 40px spacing after totals
-    
-    // Thank you message (editable)
-    QRect thankYouRect(50, footerStartY, 300, 40);
-    painter.drawText(thankYouRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.thankYouText);
-    
-    // Policy text (editable)
-    QRect policyRect(50, footerStartY + 50, 500, 60);
-    painter.drawText(policyRect, Qt::AlignLeft | Qt::TextWordWrap, m_template.policyText);
+    QRect totalLabelRect(totalsLabelX, totalY, 130, 20);
+    QRect totalValueRect(totalsValueX, totalY, 80, 20);
+    painter.drawText(totalLabelRect, Qt::AlignRight, "Total:");
+    painter.drawText(totalValueRect, Qt::AlignCenter, QString("$%1").arg(total, 0, 'f', 2));
     
     // Highlight selected element
     if (!m_selectedElement.isEmpty()) {
@@ -266,7 +281,7 @@ void TemplatePreview::drawTemplate(QPainter& painter) {
         } else if (m_selectedElement == "table") {
             painter.drawRect(m_template.tableStartPos.x() - 5, m_template.tableStartPos.y() - 15, 500, 20);
         } else if (m_selectedElement == "totals") {
-            // Highlight dynamic totals area
+            // Highlight dynamic totals area (aligned with line totals column)
             int lineItemsEndY = m_template.tableStartPos.y() + 15;
             if (m_previewOrder.lineItems.isEmpty()) {
                 lineItemsEndY += 2 * m_template.rowHeight;
@@ -274,17 +289,19 @@ void TemplatePreview::drawTemplate(QPainter& painter) {
                 lineItemsEndY += m_previewOrder.lineItems.size() * m_template.rowHeight;
             }
             int totalsStartY = lineItemsEndY + 20;
-            painter.drawRect(450 - 80, totalsStartY - 12, 160, 80);
+            // Highlight both label and value areas (using tableX offset)
+            int tableX = m_template.tableStartPos.x();
+            painter.drawRect(tableX + 400, totalsStartY - 5, 230, 85); // Covers labels and values
         } else if (m_selectedElement == "footer") {
-            // Highlight dynamic footer area
+            // Highlight dynamic footer area (left column)
             int lineItemsEndY = m_template.tableStartPos.y() + 15;
             if (m_previewOrder.lineItems.isEmpty()) {
                 lineItemsEndY += 2 * m_template.rowHeight;
             } else {
                 lineItemsEndY += m_previewOrder.lineItems.size() * m_template.rowHeight;
             }
-            int footerStartY = lineItemsEndY + 20 + 80;
-            painter.drawRect(50 - 5, footerStartY - 12, 500, 120);
+            int footerStartY = lineItemsEndY + 20;
+            painter.drawRect(45, footerStartY - 5, 385, 135); // Left column area
         }
     }
 }
@@ -389,17 +406,16 @@ QString TemplatePreview::getElementAtPoint(const QPoint& point) const {
     }
     
     int totalsStartY = lineItemsEndY + 20;
-    int totalsX = 450;
+    int tableX = m_template.tableStartPos.x();
     
-    // Check totals area (dynamic positioning)
-    QRect totalsRect(totalsX - 80, totalsStartY - 12, 160, 80); // Cover all 3 total lines
+    // Check totals area (dynamic positioning, aligned with line totals column)
+    QRect totalsRect(tableX + 400, totalsStartY - 5, 230, 85); // Covers labels and values (using tableX offset)
     if (totalsRect.contains(point)) {
         return "totals";
     }
     
-    // Check footer area (dynamic positioning after totals)
-    int footerStartY = totalsStartY + 80; // After totals section
-    QRect footerRect(50, footerStartY - 12, 500, 120); // Cover both footer sections
+    // Check footer area (dynamic positioning, left column)
+    QRect footerRect(45, totalsStartY - 5, 385, 135); // Left column area
     if (footerRect.contains(point)) {
         return "footer";
     }
@@ -430,6 +446,11 @@ void TemplateEditor::setupUI() {
     
     connect(m_preview, &TemplatePreview::templateChanged, this, &TemplateEditor::templateChanged);
     connect(m_preview, &TemplatePreview::elementSelected, this, &TemplateEditor::onElementSelected);
+    
+    // Multi-page indicator
+    m_pageIndicator = new QLabel("Single page");
+    m_pageIndicator->setStyleSheet("QLabel { background-color: #e8f4f8; border: 1px solid #b0d4e3; padding: 4px; border-radius: 3px; }");
+    m_pageIndicator->setAlignment(Qt::AlignCenter);
     
     // Properties panel
     // Logo group
@@ -560,8 +581,16 @@ void TemplateEditor::setupUI() {
     footerTabLayout->addStretch();
     m_propertiesTab->addTab(m_footerTab, "Footer");
     
+    // Create left side container with preview and indicator
+    QWidget* leftSide = new QWidget();
+    QVBoxLayout* leftLayout = new QVBoxLayout(leftSide);
+    leftLayout->addWidget(m_previewArea);
+    leftLayout->addWidget(m_pageIndicator);
+    leftLayout->setStretch(0, 1);  // Preview takes most space
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+    
     // Add widgets to splitter
-    splitter->addWidget(m_previewArea);
+    splitter->addWidget(leftSide);
     splitter->addWidget(m_propertiesTab);
     
     // Set splitter proportions (75% preview, 25% properties)
@@ -573,6 +602,9 @@ void TemplateEditor::setupUI() {
     
     // Initially disable position controls
     m_positionGroup->setEnabled(false);
+    
+    // Auto-load logo if available
+    loadDefaultTemplate();
 }
 
 void TemplateEditor::setTemplate(const InvoiceTemplate& templ) {
@@ -585,12 +617,50 @@ void TemplateEditor::setTemplate(const InvoiceTemplate& templ) {
     m_policyEdit->setPlainText(templ.policyText);
 }
 
+void TemplateEditor::loadDefaultTemplate() {
+    // Auto-load logo.png if available and not already set
+    if (m_template.logoPath.isEmpty() && QFile::exists("logo.png")) {
+        m_template.logoPath = "logo.png";
+        m_logoPathEdit->setText("logo.png");
+        m_preview->setTemplate(m_template);
+        qDebug() << "TemplateEditor::loadDefaultTemplate: Set logo path to logo.png";
+        emit templateChanged();
+    } else {
+        qDebug() << "TemplateEditor::loadDefaultTemplate: Not loading logo.png - current path:" << m_template.logoPath;
+    }
+}
+
 InvoiceTemplate TemplateEditor::getTemplate() const {
     return m_preview->getTemplate();
 }
 
 void TemplateEditor::setPreviewOrder(const Order& order) {
     m_preview->setPreviewOrder(order);
+    updatePageIndicator(order);
+}
+
+void TemplateEditor::updatePageIndicator(const Order& order) {
+    // Estimate if this order would need multiple pages
+    // Similar logic to PDFGenerator::needsMultiplePages but simplified for preview
+    
+    int headerSpace = 200;  // Approximate header + billing space
+    int footerSpace = 120;  // Approximate totals + footer space
+    int previewHeight = 776; // Approximate page height
+    int availableForItems = previewHeight - headerSpace - footerSpace - 30; // Safety margin
+    
+    int itemHeight = 22;  // Normal row height
+    int estimatedItemsHeight = order.lineItems.size() * itemHeight;
+    
+    bool needsMultiplePages = estimatedItemsHeight > availableForItems;
+    
+    if (needsMultiplePages) {
+        int estimatedPages = (estimatedItemsHeight / availableForItems) + 1;
+        m_pageIndicator->setText(QString("Multi-page (%1 pages estimated)").arg(estimatedPages));
+        m_pageIndicator->setStyleSheet("QLabel { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 4px; border-radius: 3px; }");
+    } else {
+        m_pageIndicator->setText("Single page");
+        m_pageIndicator->setStyleSheet("QLabel { background-color: #e8f4f8; border: 1px solid #b0d4e3; padding: 4px; border-radius: 3px; }");
+    }
 }
 
 void TemplateEditor::onLogoButtonClicked() {

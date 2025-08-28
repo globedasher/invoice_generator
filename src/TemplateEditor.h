@@ -79,6 +79,8 @@ private:
     void setupUI();
     void updatePropertyEditor(const QString& elementName);
     void applyPropertyChanges();
+    void loadDefaultTemplate();
+    void updatePageIndicator(const Order& order);
     
     QVBoxLayout* m_mainLayout;
     QHBoxLayout* m_contentLayout;
@@ -86,6 +88,7 @@ private:
     // Left side - preview
     QScrollArea* m_previewArea;
     TemplatePreview* m_preview;
+    QLabel* m_pageIndicator;
     
     // Right side - properties with tabs
     QTabWidget* m_propertiesTab;
