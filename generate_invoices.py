@@ -412,8 +412,15 @@ def main():
         # Fix zip code decimal point issue
         zipc_raw = first.get("billing zip", "")
         if pd.notna(zipc_raw):
-            # Convert to string and remove decimal if it's a float
-            zipc = str(int(float(zipc_raw))) if str(zipc_raw).replace('.', '').replace('-', '').isdigit() else str(zipc_raw)
+            try:
+                # Convert to string and remove decimal if it's a float
+                zipc_str = str(zipc_raw).strip()
+                if zipc_str.replace('.', '').replace('-', '').isdigit():
+                    zipc = str(int(float(zipc_str)))
+                else:
+                    zipc = zipc_str
+            except (ValueError, TypeError):
+                zipc = str(zipc_raw).strip()
         else:
             zipc = ""
         zipc = zipc.strip()
