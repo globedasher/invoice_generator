@@ -35,9 +35,9 @@ Requirements:
 import os
 import io
 import shutil
-import subprocess
 import tempfile
 import platform
+import gc
 from typing import Dict, Optional, Tuple
 
 import pandas as pd
@@ -50,21 +50,13 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.drawing.image import Image as XLImage
 from tqdm import tqdm
 
-# Windows Excel COM support
-try:
-    if platform.system() == "Windows":
-        import win32com.client as win32
-        EXCEL_AVAILABLE = True
-    else:
-        EXCEL_AVAILABLE = False
-except ImportError:
-    EXCEL_AVAILABLE = False
+# Excel COM support removed - using manual PDF export instead
 
 # ---------- CONFIG ----------
 ORDERS_CSV  = "orders.csv"
 CONFIG_XLSX = "config.xlsx"      # your template; must include 'Invoice' and 'Highlighting'
 OUTPUT_XLSX = "generated_invoices.xlsx"
-OUTPUT_PDF  = "all_invoices.pdf"
+# PDF output removed - use Excel's native "Export as PDF" feature instead
 
 DATA_START_ROW = 8  # B8 is first data row (moved up one row)
 CURRENCY_FMT = '"$"#,##0.00'
@@ -297,59 +289,8 @@ def place_amount(ws: Worksheet, label_text: str, amount: float):
     return False
 
 
-def convert_to_pdf(xlsx_path: str, pdf_path: str) -> None:
-    """Convert Excel file to PDF using platform-appropriate method."""
-    
-    if platform.system() == "Windows" and EXCEL_AVAILABLE:
-        # Use Microsoft Excel COM automation on Windows
-        try:
-            excel = win32.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
-            
-            # Open the workbook
-            workbook = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-            
-            # Export as PDF (xlTypePDF = 0)
-            workbook.ExportAsFixedFormat(0, os.path.abspath(pdf_path))
-            
-            # Close workbook and quit Excel
-            workbook.Close(SaveChanges=False)
-            excel.Quit()
-            
-            print(f"✅ Converted to PDF using Microsoft Excel")
-            
-        except Exception as e:
-            print(f"❌ Excel COM conversion failed: {e}")
-            print("Falling back to LibreOffice...")
-            convert_with_libreoffice(xlsx_path, pdf_path)
-    else:
-        # Use LibreOffice on Linux/Mac or as fallback
-        convert_with_libreoffice(xlsx_path, pdf_path)
-
-
-def convert_with_libreoffice(xlsx_path: str, pdf_path: str) -> None:
-    """Convert Excel file to PDF using LibreOffice."""
-    tmp = tempfile.mkdtemp()
-    
-    # Determine LibreOffice executable path based on platform
-    if platform.system() == "Windows":
-        soffice_cmd = r"C:\Program Files\LibreOffice\program\soffice.exe"
-    else:
-        soffice_cmd = "soffice"
-    
-    try:
-        subprocess.run(
-            [soffice_cmd, "--headless", "--convert-to", "pdf", "--outdir", tmp, xlsx_path],
-            check=True
-        )
-        generated_pdf = os.path.join(tmp, os.path.basename(xlsx_path).replace(".xlsx", ".pdf"))
-        shutil.move(generated_pdf, pdf_path)
-        print(f"✅ Converted to PDF using LibreOffice")
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"LibreOffice conversion failed: {e}")
-    finally:
-        shutil.rmtree(tmp)
+# PDF conversion functions removed - use Excel's native "Export as PDF" feature instead
+# This is much faster and more reliable for large files
 
 
 # ---------- Main ----------
@@ -381,7 +322,7 @@ def main():
     print(f"Processing {total_orders} orders...")
     
     # One invoice per order (duplicate inside same workbook so styles persist)
-    for order_id, g in tqdm(order_groups, desc="Generating invoices", unit="invoice", ascii=True):
+    for i, (order_id, g) in enumerate(tqdm(order_groups, desc="Generating invoices", unit="invoice", ascii=True)):
         ws = wb.copy_worksheet(template)
         ws.title = f"Invoice_{order_id}"
 
@@ -499,6 +440,10 @@ def main():
         last_used_row = ws.max_row
         last_row = max(r, 40, last_used_row)  # include line items, totals, and any footer content
         fit_one_page(ws, last_row, min_col_letter="B")
+        
+        # Memory cleanup every 5 invoices to prevent hanging
+        if (i + 1) % 5 == 0:
+            gc.collect()
 
     # Remove the template and highlighting sheets from the saved output
     if "Invoice" in wb.sheetnames:
@@ -508,13 +453,26 @@ def main():
             wb.remove(wb[n])
 
     print("💾 Saving Excel file...")
-    wb.save(OUTPUT_XLSX)
+    print(f"   Workbook contains {len(wb.worksheets)} sheets, this may take a moment...")
+    
+    # Force garbage collection before saving
+    gc.collect()
+    
+    try:
+        wb.save(OUTPUT_XLSX)
+        print(f"   ✅ Saved {OUTPUT_XLSX}")
+    except PermissionError:
+        print(f"❌ Permission denied: Close {OUTPUT_XLSX} if it's open in Excel/LibreOffice")
+        print("   Or delete the existing file and try again")
+        raise
+    except Exception as e:
+        print(f"❌ Error saving Excel file: {e}")
+        print("   This may be due to memory constraints with large workbooks")
+        raise
 
-    print("📄 Converting to PDF...")
-    # Export to PDF using platform-appropriate method
-    convert_to_pdf(OUTPUT_XLSX, OUTPUT_PDF)
-
-    print(f"✅ Created single PDF with wrapped descriptions, correct columns, totals, and logo: {OUTPUT_PDF}")
+    print("✅ Excel file created successfully!")
+    print(f"📄 To create PDF: Open {OUTPUT_XLSX} in Excel and use 'File > Export > Create PDF/XPS'")
+    print(f"   Select 'Entire Workbook' to include all invoices in the PDF")
 
 
 if __name__ == "__main__":
