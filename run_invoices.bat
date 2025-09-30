@@ -15,17 +15,17 @@ python generate_invoices.py
 
 echo.
 echo Deactivating virtual environment...
-deactivate
+call deactivate
 
 echo.
 echo ============================================
 echo Excel file created: generated_invoices.xlsx
 echo.
-echo To create PDF:
+echo To print invoices:
 echo 1. Open generated_invoices.xlsx in Excel
-echo 2. File ^> Export ^> Create PDF/XPS
-echo 3. Click Options and select "Entire workbook"
-echo 4. Click Publish
+echo 2. Press Ctrl+P to print
+echo 3. Select "Print Entire Workbook"
+echo 4. Choose your printer and click Print
 echo ============================================
 echo.
 echo Press any key to exit...
