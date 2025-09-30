@@ -168,12 +168,13 @@ soffice --version
 - `logo.png` - Company logo embedded in template
 
 ### Output Files  
-- `generated_invoices.xlsx` - Multi-sheet Excel with individual invoices (final output)
+- `generated_invoices_YYYYMMDD_HHMMSS.xlsx` - Multi-sheet Excel with individual invoices (timestamped final output)
 - Print directly from Excel or create PDF manually using print function (see printing instructions above)
 
 **Important Notes:**
-- The `generated_invoices.xlsx` file may be quite large (50-500MB for many orders)
-- If the script gets "Permission denied" errors, close Excel and delete any existing `generated_invoices.xlsx` file
+- Files are automatically timestamped (e.g., `generated_invoices_20240930_143022.xlsx`) to avoid conflicts
+- The Excel file may be quite large (50-500MB for many orders)
+- Timestamped filenames prevent permission errors and allow keeping multiple versions
 - Direct printing from Excel is the fastest and most reliable method
 - For 1000+ invoices, printing in smaller batches may be more practical
 
@@ -200,7 +201,7 @@ Common issues and solutions:
 
 **Runtime Issues:**
 - Missing CSV columns: Script validates and reports missing required fields
-- Permission denied on Excel file: Close Excel and delete existing `generated_invoices.xlsx`
+- Permission denied on Excel file: Rare now due to timestamped filenames, but close Excel if it occurs
 - Script hangs at "Saving Excel file": Large workbooks (50+ invoices) can take several minutes to save
 - Template format: Must contain "Invoice" sheet with expected layout
 - Image copying: Handles both file-path and binary image data safely

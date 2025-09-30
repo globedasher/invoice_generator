@@ -1,8 +1,4 @@
 @echo off
-echo Removing any existing output files...
-del /f generated_invoices.xlsx 2>nul
-
-echo.
 echo Activating virtual environment...
 call venv\Scripts\activate.bat
 
@@ -15,14 +11,14 @@ python generate_invoices.py
 
 echo.
 echo Deactivating virtual environment...
-call deactivate
+if defined VIRTUAL_ENV call deactivate
 
 echo.
 echo ============================================
-echo Excel file created: generated_invoices.xlsx
+echo Excel file created with timestamp
 echo.
 echo To print invoices:
-echo 1. Open generated_invoices.xlsx in Excel
+echo 1. Open the generated Excel file in Excel
 echo 2. Press Ctrl+P to print
 echo 3. Select "Print Entire Workbook"
 echo 4. Choose your printer and click Print
