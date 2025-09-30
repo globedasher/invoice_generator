@@ -87,18 +87,17 @@ source venv/bin/activate
 python generate_invoices.py
 ```
 
-### Converting Excel to PDF
+### Printing Invoices
 
-The script generates an Excel file (`generated_invoices.xlsx`) with all invoices. To create the final PDF:
+The script generates an Excel file (`generated_invoices.xlsx`) with all invoices. To print:
 
-**Method 1: Excel Built-in Export (Recommended)**
+**Direct Printing (Recommended)**
 1. Open `generated_invoices.xlsx` in Microsoft Excel
-2. Go to **File > Export > Create PDF/XPS**
-3. Click **Options** and select **Entire workbook**
-4. Choose output location and click **Publish**
-5. Excel will create a multi-page PDF with all invoices
+2. Press **Ctrl+P** to open Print dialog
+3. Select **Print Entire Workbook**
+4. Choose your printer and click **Print**
 
-**Method 2: Print to PDF**
+**Optional: Create PDF First**
 1. Open `generated_invoices.xlsx` in Microsoft Excel
 2. Press **Ctrl+P** to open Print dialog
 3. Select **Print Entire Workbook**
@@ -106,9 +105,9 @@ The script generates an Excel file (`generated_invoices.xlsx`) with all invoices
 5. Click **Print** and save the PDF
 
 **For Large Files (1000+ invoices):**
-- Excel's export is much faster than LibreOffice (minutes vs hours)
+- Direct printing from Excel is much faster than automated conversion
 - Uses less memory and is more reliable
-- Maintains perfect formatting and print settings
+- Consider printing in smaller batches if needed
 
 ### Development Testing
 ```bash
@@ -170,13 +169,13 @@ soffice --version
 
 ### Output Files  
 - `generated_invoices.xlsx` - Multi-sheet Excel with individual invoices (final output)
-- PDF files are created manually using Excel's export feature (see conversion instructions above)
+- Print directly from Excel or create PDF manually using print function (see printing instructions above)
 
 **Important Notes:**
 - The `generated_invoices.xlsx` file may be quite large (50-500MB for many orders)
 - If the script gets "Permission denied" errors, close Excel and delete any existing `generated_invoices.xlsx` file
-- Use Excel's native "Export as PDF" feature for best performance with large files
-- For 1000+ invoices, Excel export is much faster and more reliable than automated conversion
+- Direct printing from Excel is the fastest and most reliable method
+- For 1000+ invoices, printing in smaller batches may be more practical
 
 ### Configuration
 - **Template Layout**: Fixed cell positions (I1=order#, G5=date, B3-B5=billing, B9+=line items)
@@ -210,10 +209,11 @@ Common issues and solutions:
 - High RAM usage (500MB+): Normal for large batches, script includes memory optimizations
 - Out of memory errors: Try processing smaller batches or restart the system
 
-**PDF Conversion Issues:**
-- Use Excel's native export instead of automated conversion for best results
-- For very large files (1000+ invoices), consider exporting in batches if Excel struggles
-- Excel's "Print to PDF" option may be faster than "Export as PDF" for some files
+**Printing Issues:**
+- Direct printing from Excel is recommended for best results
+- For very large files (1000+ invoices), consider printing in smaller batches
+- Preview a few pages before printing the entire workbook
+- Check printer settings and paper supply before large batch printing
 
 ## Dependencies
 

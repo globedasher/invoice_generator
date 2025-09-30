@@ -471,8 +471,8 @@ def main():
         raise
 
     print("✅ Excel file created successfully!")
-    print(f"📄 To create PDF: Open {OUTPUT_XLSX} in Excel and use 'File > Export > Create PDF/XPS'")
-    print(f"   Select 'Entire Workbook' to include all invoices in the PDF")
+    print(f"📄 To print invoices: Open {OUTPUT_XLSX} in Excel and print (Ctrl+P)")
+    print(f"   Select 'Print Entire Workbook' to print all invoices")
 
 
 if __name__ == "__main__":
