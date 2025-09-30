@@ -9,3 +9,4 @@ pytz==2025.2
 six==1.17.0
 tzdata==2025.2
 pywin32==307; sys_platform == "win32"
+tqdm==4.66.1
