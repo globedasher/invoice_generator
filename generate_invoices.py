@@ -48,6 +48,7 @@ from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.drawing.image import Image as XLImage
+from tqdm import tqdm
 
 # Windows Excel COM support
 try:
@@ -353,6 +354,7 @@ def convert_with_libreoffice(xlsx_path: str, pdf_path: str) -> None:
 
 # ---------- Main ----------
 def main():
+    print("📊 Loading order data...")
     df = load_orders(ORDERS_CSV)
     required = [
         "order id", "created at",
@@ -364,6 +366,7 @@ def main():
     if miss:
         raise ValueError(f"CSV missing columns (after normalization): {miss}")
 
+    print("📋 Loading Excel template...")
     wb = load_workbook(CONFIG_XLSX)
     if "Invoice" not in wb.sheetnames:
         raise ValueError("config.xlsx must contain a sheet named 'Invoice' (case-sensitive).")
@@ -371,8 +374,14 @@ def main():
 
     highlights = read_highlights(wb)
 
+    # Get unique order IDs and count for progress bar
+    order_groups = list(df.groupby("order id", sort=False))
+    total_orders = len(order_groups)
+    
+    print(f"Processing {total_orders} orders...")
+    
     # One invoice per order (duplicate inside same workbook so styles persist)
-    for order_id, g in df.groupby("order id", sort=False):
+    for order_id, g in tqdm(order_groups, desc="Generating invoices", unit="invoice", ascii=True):
         ws = wb.copy_worksheet(template)
         ws.title = f"Invoice_{order_id}"
 
@@ -498,8 +507,10 @@ def main():
         if n in wb.sheetnames:
             wb.remove(wb[n])
 
+    print("💾 Saving Excel file...")
     wb.save(OUTPUT_XLSX)
 
+    print("📄 Converting to PDF...")
     # Export to PDF using platform-appropriate method
     convert_to_pdf(OUTPUT_XLSX, OUTPUT_PDF)
 
