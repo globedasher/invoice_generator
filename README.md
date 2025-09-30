@@ -1,6 +1,6 @@
 # Invoice Generator
 
-A simple tool that creates professional PDF invoices from your order data. Just provide your orders in a CSV file and customize the invoice template - the rest is automatic!
+A simple tool that creates professional Excel invoices from your order data. Just provide your orders in a CSV file and customize the invoice template - then easily export to PDF using Excel!
 
 ## 📋 What You Need
 
@@ -9,9 +9,8 @@ A simple tool that creates professional PDF invoices from your order data. Just 
 - **config.xlsx** - Your invoice template (customize with your logo and colors)
 
 ### Software Required:
-- **Windows**: Microsoft Excel (comes with Office)
-- **Mac/Linux**: LibreOffice (free download)
-- **Python** (free download from python.org)
+- **Microsoft Excel** (recommended for PDF export)
+- **Python 3.12+** (free download from python.org - check "Add to PATH" during installation)
 
 ## 🚀 Quick Start
 
@@ -28,13 +27,21 @@ A simple tool that creates professional PDF invoices from your order data. Just 
 
 **On Mac/Linux:**
 ```
-python3 generate_invoices.py
+source venv/bin/activate
+python generate_invoices.py
 ```
 
-### Step 3: Get Your Invoices
-The program creates two files:
-- **generated_invoices.xlsx** - Individual invoice sheets (for editing)
-- **all_invoices.pdf** - All invoices in one PDF (for printing/emailing)
+### Step 3: Get Your Excel File
+The program creates:
+- **generated_invoices.xlsx** - All invoices in separate sheets
+
+### Step 4: Create PDF (Manual)
+1. Open `generated_invoices.xlsx` in Microsoft Excel
+2. Go to **File > Export > Create PDF/XPS**
+3. Click **Options** and select **"Entire workbook"**
+4. Choose where to save and click **Publish**
+
+✅ **Why manual export?** Excel's PDF export is much faster and more reliable than automated conversion, especially for large files (1000+ invoices).
 
 ## 🎨 Customizing Your Invoices
 
@@ -71,28 +78,37 @@ Your `orders.csv` file should have these columns (names can vary):
 
 ## ❓ Troubleshooting
 
+**"Python is not recognized" (Windows):**
+- Reinstall Python and check "Add Python to PATH" during installation
+
 **"File not found" error:**
 - Make sure `orders.csv` and `config.xlsx` are in the same folder
 
-**PDF looks wrong:**
-- Check that your Excel template is set up correctly
-- Make sure column widths look good in Excel
+**"Permission denied" on Excel file:**
+- Close Excel completely and delete any existing `generated_invoices.xlsx` file
+
+**Script hangs on "Saving Excel file":**
+- Large files (1000+ invoices) can take 10-30 minutes - this is normal
+- Check available RAM - you need at least 4GB free for large batches
+
+**PDF export issues:**
+- Use Excel's native export for best results
+- For very large files, consider exporting in smaller batches
+- "Print to PDF" may be faster than "Export as PDF" for some files
 
 **Colors not working:**
 - Check the Highlights sheet in config.xlsx
 - Use specific words that appear in your product names
 - Avoid common words like "of" or "bundle" that match everything
 
-**Windows: Excel not opening:**
-- Make sure Microsoft Excel is installed
-- The program will try LibreOffice as backup
-
 ## 💡 Tips for Best Results
 
 1. **Test with a few orders first** before running your full batch
-2. **Keep backups** of your original files
+2. **Keep backups** of your original files  
 3. **Use specific words** for highlighting (e.g., "goldenrod" instead of "plant")
 4. **Check your template** - what you see in Excel is what you get in the PDF
+5. **For large batches (1000+ invoices)**: Ensure you have plenty of RAM and disk space
+6. **Alternative PDF method**: Use Excel's "Print to PDF" if export is slow
 
 ---
 
