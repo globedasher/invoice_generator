@@ -38,6 +38,7 @@ import shutil
 import tempfile
 import platform
 import gc
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 import pandas as pd
@@ -55,7 +56,10 @@ from tqdm import tqdm
 # ---------- CONFIG ----------
 ORDERS_CSV  = "orders.csv"
 CONFIG_XLSX = "config.xlsx"      # your template; must include 'Invoice' and 'Highlighting'
-OUTPUT_XLSX = "generated_invoices.xlsx"
+
+# Generate timestamped filename
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+OUTPUT_XLSX = f"generated_invoices_{timestamp}.xlsx"
 # PDF output removed - use Excel's native "Export as PDF" feature instead
 
 DATA_START_ROW = 8  # B8 is first data row (moved up one row)

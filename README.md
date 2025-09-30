@@ -33,10 +33,10 @@ python generate_invoices.py
 
 ### Step 3: Get Your Excel File
 The program creates:
-- **generated_invoices.xlsx** - All invoices in separate sheets
+- **generated_invoices_YYYYMMDD_HHMMSS.xlsx** - All invoices in separate sheets (timestamped)
 
 ### Step 4: Print Your Invoices
-1. Open `generated_invoices.xlsx` in Microsoft Excel
+1. Open the generated Excel file (with timestamp) in Microsoft Excel
 2. Press **Ctrl+P** to print
 3. Select **"Print Entire Workbook"**
 4. Choose your printer and click **Print**
@@ -85,7 +85,7 @@ Your `orders.csv` file should have these columns (names can vary):
 - Make sure `orders.csv` and `config.xlsx` are in the same folder
 
 **"Permission denied" on Excel file:**
-- Close Excel completely and delete any existing `generated_invoices.xlsx` file
+- Close Excel completely (files are now timestamped to avoid conflicts)
 
 **Script hangs on "Saving Excel file":**
 - Large files (1000+ invoices) can take 10-30 minutes - this is normal
@@ -109,6 +109,7 @@ Your `orders.csv` file should have these columns (names can vary):
 4. **Check your template** - what you see in Excel is what you get when printed
 5. **For large batches (1000+ invoices)**: Ensure you have plenty of RAM and disk space
 6. **Preview before printing**: Check a few pages in Excel to ensure formatting looks correct
+7. **Timestamped files**: Each run creates a new file so you can keep multiple versions
 
 ---
 
