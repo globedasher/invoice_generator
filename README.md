@@ -35,13 +35,13 @@ python generate_invoices.py
 The program creates:
 - **generated_invoices.xlsx** - All invoices in separate sheets
 
-### Step 4: Create PDF (Manual)
+### Step 4: Print Your Invoices
 1. Open `generated_invoices.xlsx` in Microsoft Excel
-2. Go to **File > Export > Create PDF/XPS**
-3. Click **Options** and select **"Entire workbook"**
-4. Choose where to save and click **Publish**
+2. Press **Ctrl+P** to print
+3. Select **"Print Entire Workbook"**
+4. Choose your printer and click **Print**
 
-✅ **Why manual export?** Excel's PDF export is much faster and more reliable than automated conversion, especially for large files (1000+ invoices).
+✅ **Why not automatic?** Direct printing from Excel is much faster and more reliable than automated conversion, especially for large files (1000+ invoices).
 
 ## 🎨 Customizing Your Invoices
 
@@ -91,10 +91,10 @@ Your `orders.csv` file should have these columns (names can vary):
 - Large files (1000+ invoices) can take 10-30 minutes - this is normal
 - Check available RAM - you need at least 4GB free for large batches
 
-**PDF export issues:**
-- Use Excel's native export for best results
-- For very large files, consider exporting in smaller batches
-- "Print to PDF" may be faster than "Export as PDF" for some files
+**Printing issues:**
+- Check printer settings before printing large batches
+- For very large files (1000+ invoices), consider printing in smaller batches
+- Preview a few pages first to ensure formatting looks correct
 
 **Colors not working:**
 - Check the Highlights sheet in config.xlsx
@@ -106,9 +106,9 @@ Your `orders.csv` file should have these columns (names can vary):
 1. **Test with a few orders first** before running your full batch
 2. **Keep backups** of your original files  
 3. **Use specific words** for highlighting (e.g., "goldenrod" instead of "plant")
-4. **Check your template** - what you see in Excel is what you get in the PDF
+4. **Check your template** - what you see in Excel is what you get when printed
 5. **For large batches (1000+ invoices)**: Ensure you have plenty of RAM and disk space
-6. **Alternative PDF method**: Use Excel's "Print to PDF" if export is slow
+6. **Preview before printing**: Check a few pages in Excel to ensure formatting looks correct
 
 ---
 
