@@ -11,7 +11,7 @@ python generate_invoices.py
 
 echo.
 echo Deactivating virtual environment...
-call deactivate
+if defined VIRTUAL_ENV call deactivate
 
 echo.
 echo ============================================
