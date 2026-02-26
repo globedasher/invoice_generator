@@ -385,8 +385,10 @@ def main():
             ws.column_dimensions[get_column_letter(cidx)].width = width
 
         # ----- Line items (start B9/C9/F9/G9) -----
+        # Sort line items alphabetically by description
+        g_sorted = g.sort_values('lineitem name', na_position='last')
         r = DATA_START_ROW
-        for _, it in g.iterrows():
+        for _, it in g_sorted.iterrows():
             qty   = it.get("lineitem quantity", "")
             desc  = str(it.get("lineitem name", "") or "")
             unitp = float(pd.to_numeric(it.get("lineitem price"), errors="coerce") or 0.0)
